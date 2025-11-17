@@ -55,47 +55,64 @@ export default function ConnectWhatsAppPage() {
 
     try {
       // Launch Meta Embedded Signup
-      if (window.FB) {
-        window.FB.login(
-          async (response: any) => {
-            if (response.authResponse && response.authResponse.code) {
-              try {
-                const result = await whatsappApi.connect({
-                  companyId: currentCompany,
-                  code: response.authResponse.code,
-                });
-
-                if (result.success) {
-                  setConnected(true);
-                  setTimeout(() => {
-                    router.push('/dashboard');
-                  }, 2000);
-                }
-              } catch (err: any) {
-                setError(err.response?.data?.message || 'Failed to connect WhatsApp');
-              } finally {
-                setIsConnecting(false);
-              }
-            } else {
-              setError('Failed to get authorization code from Meta');
-              setIsConnecting(false);
-            }
-          },
-          {
-            config_id: process.env.NEXT_PUBLIC_META_CONFIG_ID || '2216301802211791',
-            response_type: 'code',
-            override_default_response_type: true,
-            extras: {
-              sessionInfoVersion: '3',
-            },
-          }
-        );
-      } else {
+      if (!window.FB) {
         setError('Facebook SDK not loaded. Please refresh the page.');
         setIsConnecting(false);
+        return;
       }
+
+      window.FB.login(
+        async (response: any) => {
+          console.log('FB.login response:', response);
+          
+          if (response.error) {
+            console.error('FB.login error:', response.error);
+            setError(response.error.message || 'Failed to authenticate with Meta');
+            setIsConnecting(false);
+            return;
+          }
+
+          if (response.authResponse && response.authResponse.code) {
+            try {
+              console.log('Exchanging code for access token...');
+              const result = await whatsappApi.connect({
+                companyId: currentCompany,
+                code: response.authResponse.code,
+              });
+
+              if (result.success) {
+                setConnected(true);
+                setTimeout(() => {
+                  router.push('/dashboard');
+                }, 2000);
+              } else {
+                setError('Failed to connect WhatsApp. Please try again.');
+                setIsConnecting(false);
+              }
+            } catch (err: any) {
+              console.error('Backend error:', err);
+              const errorMessage = err.response?.data?.message || err.message || 'Failed to connect WhatsApp';
+              setError(errorMessage);
+              setIsConnecting(false);
+            }
+          } else {
+            console.error('No code in response:', response);
+            setError('Failed to get authorization code from Meta. Please try again.');
+            setIsConnecting(false);
+          }
+        },
+        {
+          config_id: process.env.NEXT_PUBLIC_META_CONFIG_ID || '2216301802211791',
+          response_type: 'code',
+          override_default_response_type: true,
+          extras: {
+            sessionInfoVersion: '3',
+          },
+        }
+      );
     } catch (err: any) {
-      setError('Failed to connect WhatsApp. Please try again.');
+      console.error('Connection error:', err);
+      setError(err.message || 'Failed to connect WhatsApp. Please try again.');
       setIsConnecting(false);
     }
   };
