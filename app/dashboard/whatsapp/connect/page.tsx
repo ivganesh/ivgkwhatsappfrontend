@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { whatsappApi } from '@/lib/api/whatsapp';
 import { companiesApi } from '@/lib/api/companies';
 import { useAuthStore } from '@/lib/store/auth-store';
@@ -48,7 +47,6 @@ export default function ConnectWhatsAppPage() {
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
-  const [useCoexistence, setUseCoexistence] = useState(false);
 
   // Load companies
   const { data: companies, isLoading: isLoadingCompanies } = useQuery({
@@ -268,67 +266,56 @@ export default function ConnectWhatsAppPage() {
             <AlertDescription className="text-sm mt-2 space-y-2">
               <p>
                 You can use the same phone number on both WhatsApp Business App and WhatsApp Cloud API. 
-                If you have an existing WhatsApp Business App number that&apos;s been active for at least 7 days, 
-                you can connect it during the signup process.
+                When you enter your phone number during Meta&apos;s signup process, Meta will automatically detect 
+                if it&apos;s already registered with WhatsApp and show you coexistence options.
               </p>
-              <p className="font-semibold text-blue-700">
-                ⚠️ If you see an error saying &quot;This phone number is already registered&quot;:
+              <p className="font-semibold text-blue-700 mt-3">
+                How it works:
               </p>
               <ol className="list-decimal list-inside space-y-1 ml-2">
-                <li>Click the &quot;About existing numbers&quot; link in the Meta signup dialog</li>
-                <li>Select the coexistence option to link your existing WhatsApp Business App number</li>
-                <li>You&apos;ll need to scan a QR code from your WhatsApp Business App to complete the linking</li>
-                <li>Do NOT disconnect your number - coexistence allows both to work together</li>
+                <li>Click &quot;Connect WhatsApp Business&quot; to start the signup process</li>
+                <li>Log in with your Facebook/Meta Business account</li>
+                <li>When you enter your phone number, Meta checks if it&apos;s already registered</li>
+                <li>If registered, you&apos;ll see a &quot;Select your setup&quot; screen with two options:
+                  <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
+                    <li><strong>Connect your existing WhatsApp Business App</strong> - For coexistence</li>
+                    <li><strong>Start with a new WhatsApp phone number</strong> - For a new number</li>
+                  </ul>
+                </li>
+                <li>Select coexistence and scan the QR code from your WhatsApp Business App</li>
               </ol>
+              <p className="text-xs text-gray-600 mt-2 italic">
+                Note: The detection is based on the phone number you enter, not your email or account.
+              </p>
             </AlertDescription>
           </Alert>
 
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="coexistence"
-                checked={useCoexistence}
-                onCheckedChange={(checked) => setUseCoexistence(checked === true)}
-              />
-              <Label
-                htmlFor="coexistence"
-                className="text-sm font-normal cursor-pointer"
-              >
-                I want to use my existing WhatsApp Business App number (Coexistence)
-              </Label>
-            </div>
-            {useCoexistence && (
-              <Alert className="bg-blue-50 border-blue-200">
-                <AlertDescription className="text-xs text-blue-800 space-y-2">
-                  <div>
-                    <strong>Requirements:</strong>
-                    <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
-                      <li>Phone number active on WhatsApp Business App for at least 7 days</li>
-                      <li>Real customer conversations (not just test messages)</li>
-                      <li>WhatsApp Business App version 2.24.17 or later</li>
-                      <li>Number must be from a supported region (not EEA, UK, Australia, Japan, Nigeria, Philippines, Russia, South Korea, South Africa, or Turkey)</li>
-                    </ul>
-                  </div>
-                  <div className="mt-2">
-                    <strong>Important:</strong> When Meta shows an error about the number being registered, 
-                    click &quot;About existing numbers&quot; to access coexistence options. You&apos;ll scan a QR code 
-                    from your WhatsApp Business App (Settings → WhatsApp → Sign Up with Facebook) to link it.
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertDescription className="text-xs text-blue-800 space-y-2">
+              <div>
+                <strong>Coexistence Requirements:</strong>
+                <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+                  <li>Phone number active on WhatsApp Business App for at least 7 days</li>
+                  <li>Real customer conversations (not just test messages)</li>
+                  <li>WhatsApp Business App version 2.24.17 or later</li>
+                  <li>Number must be from a supported region (not EEA, UK, Australia, Japan, Nigeria, Philippines, Russia, South Korea, South Africa, or Turkey)</li>
+                </ul>
+              </div>
+              <div className="mt-2">
+                <strong>Important:</strong> Meta will automatically detect if your phone number is registered 
+                when you enter it during the signup process. If eligible, you&apos;ll see the &quot;Select your setup&quot; 
+                screen where you can choose coexistence. You&apos;ll then scan a QR code from your WhatsApp Business App 
+                (Settings → WhatsApp → Sign Up with Facebook) to complete the linking.
+              </div>
+            </AlertDescription>
+          </Alert>
 
           <div className="space-y-2">
             <h3 className="font-semibold">What you&apos;ll need:</h3>
             <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
               <li>A Facebook Business account</li>
               <li>Access to Meta Business Manager</li>
-              <li>
-                {useCoexistence
-                  ? 'An existing WhatsApp Business App number (active for 7+ days)'
-                  : 'A phone number for WhatsApp Business'}
-              </li>
+              <li>A phone number for WhatsApp Business (or existing WhatsApp Business App number for coexistence)</li>
             </ul>
           </div>
 
