@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminApi } from '@/lib/api/admin';
+import { adminApi, Company } from '@/lib/api/admin';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +45,7 @@ export default function AdminCompaniesPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {data?.data.map((company) => (
+            {data?.data.map((company: Company) => (
               <div
                 key={company.id}
                 className="flex items-center justify-between p-4 border rounded-lg"
