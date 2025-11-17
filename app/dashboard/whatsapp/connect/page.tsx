@@ -20,9 +20,22 @@ export default function ConnectWhatsAppPage() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [sdkReady, setSdkReady] = useState(false);
 
   useEffect(() => {
     // Load Facebook SDK
+    if (window.FB) {
+      // SDK already loaded
+      window.FB.init({
+        appId: process.env.NEXT_PUBLIC_META_APP_ID || '3449670348602936',
+        version: 'v18.0',
+        cookie: true,
+        xfbml: false,
+      });
+      setSdkReady(true);
+      return;
+    }
+
     const script = document.createElement('script');
     script.src = 'https://connect.facebook.net/en_US/sdk.js';
     script.async = true;
@@ -35,12 +48,23 @@ export default function ConnectWhatsAppPage() {
         window.FB.init({
           appId: process.env.NEXT_PUBLIC_META_APP_ID || '3449670348602936',
           version: 'v18.0',
+          cookie: true,
+          xfbml: false,
         });
+        console.log('Facebook SDK initialized');
+        setSdkReady(true);
       }
     };
 
+    script.onerror = () => {
+      console.error('Failed to load Facebook SDK');
+      setError('Failed to load Facebook SDK. Please check your internet connection.');
+    };
+
     return () => {
-      document.body.removeChild(script);
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
     };
   }, []);
 
@@ -173,7 +197,7 @@ export default function ConnectWhatsAppPage() {
 
           <Button
             onClick={handleConnect}
-            disabled={isConnecting || !currentCompany}
+            disabled={isConnecting || !currentCompany || !sdkReady}
             className="w-full"
             size="lg"
           >
@@ -181,6 +205,11 @@ export default function ConnectWhatsAppPage() {
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Connecting...
+              </>
+            ) : !sdkReady ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading...
               </>
             ) : (
               'Connect WhatsApp Business'
