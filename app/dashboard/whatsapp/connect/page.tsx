@@ -69,7 +69,7 @@ export default function ConnectWhatsAppPage() {
       if (window.FB) {
         window.FB.init({
           appId: process.env.NEXT_PUBLIC_META_APP_ID || '3449670348602936',
-          version: 'v18.0',
+          version: 'v23.0',
           cookie: true,
           xfbml: false,
         });
