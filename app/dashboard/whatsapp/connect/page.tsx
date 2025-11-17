@@ -119,7 +119,7 @@ export default function ConnectWhatsAppPage() {
       }
 
       window.FB.login(
-        async (response: {
+        (response: {
           authResponse?: { code: string };
           error?: { message: string };
         }) => {
@@ -133,29 +133,32 @@ export default function ConnectWhatsAppPage() {
           }
 
           if (response.authResponse && response.authResponse.code) {
-            try {
-              console.log('Exchanging code for access token...');
-              const result = await whatsappApi.connect({
-                companyId: currentCompany,
-                code: response.authResponse.code,
-              });
+            // Handle async operation without making callback async
+            (async () => {
+              try {
+                console.log('Exchanging code for access token...');
+                const result = await whatsappApi.connect({
+                  companyId: currentCompany,
+                  code: response.authResponse!.code,
+                });
 
-              if (result.success) {
-                setConnected(true);
-                setTimeout(() => {
-                  router.push('/dashboard');
-                }, 2000);
-              } else {
-                setError('Failed to connect WhatsApp. Please try again.');
+                if (result.success) {
+                  setConnected(true);
+                  setTimeout(() => {
+                    router.push('/dashboard');
+                  }, 2000);
+                } else {
+                  setError('Failed to connect WhatsApp. Please try again.');
+                  setIsConnecting(false);
+                }
+              } catch (err: unknown) {
+                console.error('Backend error:', err);
+                const error = err as { response?: { data?: { message?: string } }; message?: string };
+                const errorMessage = error.response?.data?.message || error.message || 'Failed to connect WhatsApp';
+                setError(errorMessage);
                 setIsConnecting(false);
               }
-            } catch (err: unknown) {
-              console.error('Backend error:', err);
-              const error = err as { response?: { data?: { message?: string } }; message?: string };
-              const errorMessage = error.response?.data?.message || error.message || 'Failed to connect WhatsApp';
-              setError(errorMessage);
-              setIsConnecting(false);
-            }
+            })();
           } else {
             console.error('No code in response:', response);
             setError('Failed to get authorization code from Meta. Please try again.');
