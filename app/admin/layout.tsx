@@ -3,10 +3,10 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
-import { Sidebar } from '@/components/dashboard/sidebar';
-import { Header } from '@/components/dashboard/header';
+import { Sidebar } from '@/components/admin/sidebar';
+import { Header } from '@/components/admin/header';
 
-export default function DashboardLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -17,10 +17,12 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!accessToken || !user) {
       router.push('/auth/login');
+    } else if (!user.isSuperAdmin) {
+      router.push('/dashboard');
     }
   }, [accessToken, user, router]);
 
-  if (!accessToken || !user) {
+  if (!accessToken || !user || !user.isSuperAdmin) {
     return null;
   }
 

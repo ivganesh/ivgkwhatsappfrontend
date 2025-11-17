@@ -42,8 +42,10 @@ export default function LoginPage() {
       const response = await authApi.login(data);
       setAuth(response.user, response.accessToken, response.refreshToken);
 
-      // Redirect to dashboard
-      if (response.user.companies && response.user.companies.length > 0) {
+      // Redirect based on user type
+      if (response.user.isSuperAdmin) {
+        router.push('/admin');
+      } else if (response.user.companies && response.user.companies.length > 0) {
         router.push('/dashboard');
       } else {
         router.push('/onboarding');

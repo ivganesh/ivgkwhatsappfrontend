@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  MessageSquare, 
   Users, 
-  FileText, 
-  Send, 
+  Building2, 
+  BarChart3, 
   Settings, 
   LogOut,
-  LayoutDashboard
+  LayoutDashboard,
+  Shield
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useRouter } from 'next/navigation';
@@ -17,12 +17,11 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
-  { name: 'Contacts', href: '/dashboard/contacts', icon: Users },
-  { name: 'Templates', href: '/dashboard/templates', icon: FileText },
-  { name: 'Campaigns', href: '/dashboard/campaigns', icon: Send },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { name: 'Users', href: '/admin/users', icon: Users },
+  { name: 'Companies', href: '/admin/companies', icon: Building2 },
+  { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+  { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
 export function Sidebar() {
@@ -38,7 +37,10 @@ export function Sidebar() {
   return (
     <div className="flex h-screen w-64 flex-col bg-gray-900 text-white">
       <div className="flex h-16 items-center px-6 border-b border-gray-800">
-        <h1 className="text-xl font-bold text-green-400">IVGK WhatsApp</h1>
+        <div className="flex items-center gap-2">
+          <Shield className="h-6 w-6 text-yellow-400" />
+          <h1 className="text-xl font-bold">Admin Panel</h1>
+        </div>
       </div>
       
       <nav className="flex-1 space-y-1 px-3 py-4">
@@ -51,7 +53,7 @@ export function Sidebar() {
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-green-600 text-white'
+                  ? 'bg-yellow-600 text-white'
                   : 'text-gray-300 hover:bg-gray-800 hover:text-white'
               )}
             >
@@ -66,6 +68,7 @@ export function Sidebar() {
         <div className="mb-3 px-3">
           <p className="text-sm font-medium text-white">{user?.name}</p>
           <p className="text-xs text-gray-400">{user?.email}</p>
+          <p className="text-xs text-yellow-400 mt-1">Super Admin</p>
         </div>
         <Button
           variant="ghost"

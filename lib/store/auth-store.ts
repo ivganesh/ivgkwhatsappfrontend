@@ -6,6 +6,7 @@ interface User {
   email: string;
   name: string;
   emailVerified: boolean;
+  isSuperAdmin?: boolean;
   companies?: Array<{
     id: string;
     name: string;
