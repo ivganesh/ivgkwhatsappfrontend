@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { authApi } from '@/lib/api/auth';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,22 +18,23 @@ function VerifyEmailContent() {
   useEffect(() => {
     const token = searchParams.get('token');
 
-    if (!token) {
-      setStatus('error');
-      setMessage('Verification token is missing');
-      return;
-    }
-
     const verifyEmail = async () => {
+      if (!token) {
+        setStatus('error');
+        setMessage('Verification token is missing');
+        return;
+      }
+
       try {
         const result = await authApi.verifyEmail(token);
         setStatus('success');
         setMessage(result.message || 'Email verified successfully!');
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { message?: string } }; message?: string };
         setStatus('error');
         setMessage(
-          error.response?.data?.message ||
-            error.message ||
+          err.response?.data?.message ||
+            err.message ||
             'Failed to verify email. The link may be invalid or expired.',
         );
       }

@@ -55,8 +55,9 @@ export default function OnboardingPage() {
       });
       setCurrentCompany(company.id);
       setStep('whatsapp');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create company');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to create company');
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +76,7 @@ export default function OnboardingPage() {
           <CardContent>
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
-                You'll be redirected to Meta's Embedded Signup to connect your WhatsApp Business account.
+                You&apos;ll be redirected to Meta&apos;s Embedded Signup to connect your WhatsApp Business account.
               </p>
               <Button
                 onClick={() => router.push('/dashboard/whatsapp/connect')}

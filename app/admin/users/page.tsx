@@ -6,7 +6,7 @@ import { adminApi, User } from '@/lib/api/admin';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, UserCheck, UserX, Shield } from 'lucide-react';
+import { Plus, Trash2, UserCheck, UserX, Shield } from 'lucide-react';
 import {
   Dialog,
   DialogContent,

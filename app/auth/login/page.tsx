@@ -50,8 +50,9 @@ export default function LoginPage() {
       } else {
         router.push('/onboarding');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -107,7 +108,7 @@ export default function LoginPage() {
 
             <div className="text-center text-sm">
               <Link href="/auth/register" className="text-green-600 hover:underline">
-                Don't have an account? Sign up
+                Don&apos;t have an account? Sign up
               </Link>
             </div>
           </form>

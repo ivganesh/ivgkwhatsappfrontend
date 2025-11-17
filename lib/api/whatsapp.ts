@@ -25,7 +25,7 @@ export const whatsappApi = {
     phoneNumber: string,
     templateName: string,
     languageCode: string,
-    components?: any[]
+    components?: Array<Record<string, unknown>>
   ) => {
     const response = await apiClient.post('/whatsapp/send/template', {
       companyId,

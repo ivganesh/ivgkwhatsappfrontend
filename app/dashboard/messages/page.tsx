@@ -23,8 +23,9 @@ export default function MessagesPage() {
       await whatsappApi.sendText(currentCompany, phoneNumber, message);
       setMessage('');
       alert('Message sent successfully!');
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to send message');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      alert(err.response?.data?.message || 'Failed to send message');
     } finally {
       setIsSending(false);
     }

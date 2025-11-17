@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Building2, CheckCircle2, XCircle, MessageSquare, Users, Send } from 'lucide-react';
-import Link from 'next/link';
 
 export default function AdminCompaniesPage() {
   const [page, setPage] = useState(1);

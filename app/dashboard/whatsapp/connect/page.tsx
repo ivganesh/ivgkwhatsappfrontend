@@ -2,37 +2,77 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { whatsappApi } from '@/lib/api/whatsapp';
+import { companiesApi } from '@/lib/api/companies';
 import { useAuthStore } from '@/lib/store/auth-store';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2, Plus } from 'lucide-react';
+
+interface FacebookSDK {
+  init: (config: { appId: string; version: string; cookie?: boolean; xfbml?: boolean }) => void;
+  login: (
+    callback: (response: {
+      authResponse?: { code: string };
+      error?: { message: string };
+    }) => void,
+    options: {
+      config_id: string;
+      response_type: string;
+      override_default_response_type: boolean;
+      extras?: { sessionInfoVersion: string };
+    }
+  ) => void;
+}
 
 declare global {
   interface Window {
-    FB: any;
+    FB?: FacebookSDK;
   }
 }
 
 export default function ConnectWhatsAppPage() {
   const router = useRouter();
-  const { currentCompany, user } = useAuthStore();
+  const { currentCompany, setCurrentCompany } = useAuthStore();
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
 
+  // Load companies
+  const { data: companies, isLoading: isLoadingCompanies } = useQuery({
+    queryKey: ['companies'],
+    queryFn: () => companiesApi.getAll(),
+  });
+
+  // Set current company if not set but user has companies
+  useEffect(() => {
+    if (!currentCompany && companies && companies.length > 0) {
+      setCurrentCompany(companies[0].id);
+    }
+  }, [currentCompany, companies, setCurrentCompany]);
+
   useEffect(() => {
     // Load Facebook SDK
-    if (window.FB) {
-      // SDK already loaded
-      window.FB.init({
-        appId: process.env.NEXT_PUBLIC_META_APP_ID || '3449670348602936',
-        version: 'v18.0',
-        cookie: true,
-        xfbml: false,
-      });
-      setSdkReady(true);
+    const initSDK = () => {
+      if (window.FB) {
+        window.FB.init({
+          appId: process.env.NEXT_PUBLIC_META_APP_ID || '3449670348602936',
+          version: 'v18.0',
+          cookie: true,
+          xfbml: false,
+        });
+        setSdkReady(true);
+        return true;
+      }
+      return false;
+    };
+
+    if (initSDK()) {
       return;
     }
 
@@ -44,15 +84,8 @@ export default function ConnectWhatsAppPage() {
     document.body.appendChild(script);
 
     script.onload = () => {
-      if (window.FB) {
-        window.FB.init({
-          appId: process.env.NEXT_PUBLIC_META_APP_ID || '3449670348602936',
-          version: 'v18.0',
-          cookie: true,
-          xfbml: false,
-        });
+      if (initSDK()) {
         console.log('Facebook SDK initialized');
-        setSdkReady(true);
       }
     };
 
@@ -86,7 +119,10 @@ export default function ConnectWhatsAppPage() {
       }
 
       window.FB.login(
-        async (response: any) => {
+        async (response: {
+          authResponse?: { code: string };
+          error?: { message: string };
+        }) => {
           console.log('FB.login response:', response);
           
           if (response.error) {
@@ -113,9 +149,10 @@ export default function ConnectWhatsAppPage() {
                 setError('Failed to connect WhatsApp. Please try again.');
                 setIsConnecting(false);
               }
-            } catch (err: any) {
+            } catch (err: unknown) {
               console.error('Backend error:', err);
-              const errorMessage = err.response?.data?.message || err.message || 'Failed to connect WhatsApp';
+              const error = err as { response?: { data?: { message?: string } }; message?: string };
+              const errorMessage = error.response?.data?.message || error.message || 'Failed to connect WhatsApp';
               setError(errorMessage);
               setIsConnecting(false);
             }
@@ -134,9 +171,10 @@ export default function ConnectWhatsAppPage() {
           },
         }
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Connection error:', err);
-      setError(err.message || 'Failed to connect WhatsApp. Please try again.');
+      const error = err as { message?: string };
+      setError(error.message || 'Failed to connect WhatsApp. Please try again.');
       setIsConnecting(false);
     }
   };
@@ -186,8 +224,33 @@ export default function ConnectWhatsAppPage() {
             </div>
           )}
 
+          {isLoadingCompanies ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          ) : companies && companies.length > 0 ? (
+            <div className="space-y-2">
+              <Label htmlFor="company-select">Select Company</Label>
+              <Select
+                value={currentCompany || ''}
+                onValueChange={(value) => setCurrentCompany(value)}
+              >
+                <SelectTrigger id="company-select">
+                  <SelectValue placeholder="Select a company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
           <div className="space-y-2">
-            <h3 className="font-semibold">What you'll need:</h3>
+            <h3 className="font-semibold">What you&apos;ll need:</h3>
             <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
               <li>A Facebook Business account</li>
               <li>Access to Meta Business Manager</li>
@@ -217,9 +280,17 @@ export default function ConnectWhatsAppPage() {
           </Button>
 
           {!currentCompany && (
-            <p className="text-sm text-yellow-600">
-              Please create a company first before connecting WhatsApp.
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm text-yellow-600">
+                Please create a company first before connecting WhatsApp.
+              </p>
+              <Link href="/onboarding">
+                <Button variant="outline" className="w-full">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Company
+                </Button>
+              </Link>
+            </div>
           )}
         </CardContent>
       </Card>
