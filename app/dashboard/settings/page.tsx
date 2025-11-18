@@ -13,10 +13,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, ExternalLink, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { companiesApi, type CompanyDetail } from '@/lib/api/companies';
@@ -94,11 +100,15 @@ export default function SettingsPage() {
     }
   }, [company, reset]);
 
-  const webhookUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || '';
-    if (!base) return 'https://yourdomain.com/api/whatsapp/webhook';
-    return `${base.replace(/\/$/, '')}/whatsapp/webhook`;
+  const apiBaseUrl = useMemo(() => {
+    const raw = process.env.NEXT_PUBLIC_API_URL || '';
+    if (!raw) {
+      return 'https://your-domain.com/api';
+    }
+    return raw.replace(/\/$/, '');
   }, []);
+
+  const webhookUrl = useMemo(() => `${apiBaseUrl}/whatsapp/webhook`, [apiBaseUrl]);
 
   const onSubmit = async (values: SettingsFormValues) => {
     if (!currentCompany) return;
@@ -153,7 +163,9 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-gray-600">Manage company profile, localization, and WhatsApp connection.</p>
+        <p className="text-gray-600">
+          Manage company configuration, WhatsApp connectivity, and developer integrations.
+        </p>
       </div>
 
       <Card>
@@ -242,7 +254,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>WhatsApp connection</CardTitle>
-          <CardDescription>Monitor your WhatsApp Business integration status.</CardDescription>
+          <CardDescription>Monitor the status of your WhatsApp Business integration.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -294,15 +306,21 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Webhook & API</CardTitle>
-          <CardDescription>Use these values when configuring Meta webhooks.</CardDescription>
+          <CardTitle>Webhook &amp; API</CardTitle>
+          <CardDescription>Configure Meta webhooks and integrate with the IVGK REST API.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           <div className="space-y-2">
             <Label>Webhook URL</Label>
             <div className="flex gap-2">
               <Input readOnly value={webhookUrl} />
+              <Button variant="outline" size="sm" onClick={() => navigator.clipboard?.writeText(webhookUrl)}>
+                Copy
+              </Button>
             </div>
+            <p className="text-xs text-gray-500">
+              Configure this URL and the verify token inside <strong>Meta Business Manager → WhatsApp → Configuration → Webhooks</strong>.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -313,11 +331,81 @@ export default function SettingsPage() {
             />
           </div>
 
+          <div className="space-y-2 border-t pt-4">
+            <p className="text-sm font-semibold text-gray-800">API base URL</p>
+            <div className="flex items-center justify-between rounded border bg-muted/40 px-3 py-2 text-sm font-mono">
+              <span>{apiBaseUrl}</span>
+              <Button variant="ghost" size="sm" className="h-auto px-2 py-0" onClick={() => navigator.clipboard?.writeText(apiBaseUrl)}>
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Authenticate via <code>POST {apiBaseUrl}/auth/login</code> and send the returned JWT in{' '}
+              <code>Authorization: Bearer &lt;token&gt;</code>. API-key support is coming soon.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-gray-800">Send a text message</p>
+            <pre className="rounded bg-slate-900 p-4 text-xs text-slate-100 overflow-auto">{`curl -X POST ${apiBaseUrl}/whatsapp/send/text \\
+  -H "Authorization: Bearer <JWT_TOKEN>" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+  "companyId": "${currentCompany ?? '<your-company-id>'}",
+  "phoneNumber": "+919876543210",
+  "message": "Hi John, your order has been received."
+}'`}</pre>
+            <p className="text-xs text-gray-500">Phone numbers must be E.164 format (+countrycode...).</p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-gray-800">Send an approved template</p>
+            <pre className="rounded bg-slate-900 p-4 text-xs text-slate-100 overflow-auto">{`curl -X POST ${apiBaseUrl}/whatsapp/send/template \\
+  -H "Authorization: Bearer <JWT_TOKEN>" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+  "companyId": "${company?.id ?? '<your-company-id>'}",
+  "phoneNumber": "+919876543210",
+  "templateName": "order_update",
+  "languageCode": "en_US",
+  "components": [
+    {
+      "type": "body",
+      "parameters": [
+        { "type": "text", "text": "John" },
+        { "type": "text", "text": "#12345" }
+      ]
+    }
+  ]
+}'`}</pre>
+            <p className="text-xs text-gray-500">
+              Use the template slug shown on the Templates page and match the approved <code>languageCode</code>. Format{' '}
+              <code>components</code> as described in the{' '}
+              <Link
+                className="underline"
+                href="https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages#template-object"
+                target="_blank"
+              >
+                WhatsApp documentation
+              </Link>
+              .
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-gray-800">Retrieve message history</p>
+            <pre className="rounded bg-slate-900 p-4 text-xs text-slate-100 overflow-auto">{`curl "${apiBaseUrl}/messages?companyId=${company?.id ?? '<your-company-id>'}&limit=50" \\
+  -H "Authorization: Bearer <JWT_TOKEN>"`}</pre>
+            <p className="text-xs text-gray-500">
+              Returns outbound &amp; inbound messages with delivery states. Use <code>contactId</code>, <code>page</code>, and{' '}
+              <code>limit</code> to paginate.
+            </p>
+          </div>
+
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Configure the same webhook URL and verify token inside Meta Business Manager under
-              <strong> WhatsApp → Configuration → Webhooks</strong>.
+              Need API keys or custom automation? Reach out to support—we can guide you through secure server-to-server messaging.
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -325,4 +413,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
