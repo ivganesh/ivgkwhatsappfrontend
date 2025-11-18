@@ -5,9 +5,22 @@ export interface ConnectWhatsAppDto {
   code: string;
 }
 
+export interface ConfigureManualDto {
+  companyId: string;
+  wabaId: string;
+  phoneNumberId: string;
+  accessToken: string;
+  phoneNumber?: string;
+}
+
 export const whatsappApi = {
   connect: async (data: ConnectWhatsAppDto) => {
     const response = await apiClient.post('/whatsapp/connect', data);
+    return response.data;
+  },
+
+  configureManual: async (data: ConfigureManualDto) => {
+    const response = await apiClient.post('/whatsapp/configure-manual', data);
     return response.data;
   },
 

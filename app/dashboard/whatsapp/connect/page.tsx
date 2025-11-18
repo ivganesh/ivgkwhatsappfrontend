@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { whatsappApi } from '@/lib/api/whatsapp';
 import { companiesApi } from '@/lib/api/companies';
 import { useAuthStore } from '@/lib/store/auth-store';
@@ -47,6 +49,14 @@ export default function ConnectWhatsAppPage() {
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
+  
+  // Manual configuration form state
+  const [manualConfig, setManualConfig] = useState({
+    wabaId: '',
+    phoneNumberId: '',
+    accessToken: '',
+    phoneNumber: '',
+  });
 
   // Load companies
   const { data: companies, isLoading: isLoadingCompanies } = useQuery({
@@ -105,6 +115,47 @@ export default function ConnectWhatsAppPage() {
       }
     };
   }, []);
+
+  const handleManualConfigure = async () => {
+    if (!currentCompany) {
+      setError('Please select a company first');
+      return;
+    }
+
+    if (!manualConfig.wabaId || !manualConfig.phoneNumberId || !manualConfig.accessToken) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setIsConnecting(true);
+    setError(null);
+
+    try {
+      const result = await whatsappApi.configureManual({
+        companyId: currentCompany,
+        wabaId: manualConfig.wabaId,
+        phoneNumberId: manualConfig.phoneNumberId,
+        accessToken: manualConfig.accessToken,
+        phoneNumber: manualConfig.phoneNumber || undefined,
+      });
+
+      if (result.success) {
+        setConnected(true);
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 2000);
+      } else {
+        setError('Failed to configure WhatsApp. Please verify your credentials.');
+        setIsConnecting(false);
+      }
+    } catch (err: unknown) {
+      console.error('Manual configuration error:', err);
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to configure WhatsApp';
+      setError(errorMessage);
+      setIsConnecting(false);
+    }
+  };
 
   const handleConnect = async () => {
     if (!currentCompany) {
@@ -217,18 +268,25 @@ export default function ConnectWhatsAppPage() {
       <div>
         <h1 className="text-3xl font-bold">Connect WhatsApp</h1>
         <p className="text-gray-600 mt-2">
-          Connect your WhatsApp Business account via Meta Embedded Signup
+          Connect your WhatsApp Business account using onboarding or manual configuration
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Meta Embedded Signup</CardTitle>
+          <CardTitle>WhatsApp Configuration</CardTitle>
           <CardDescription>
-            Connect your WhatsApp Business account to start sending and receiving messages
+            Choose how you want to connect your WhatsApp Business account
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
+          <Tabs defaultValue="onboarding" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+              <TabsTrigger value="manual">Manual Setup</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="onboarding" className="space-y-4 mt-4">
           {error && (
             <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
               {error}
@@ -340,19 +398,165 @@ export default function ConnectWhatsAppPage() {
             )}
           </Button>
 
-          {!currentCompany && (
-            <div className="space-y-3">
-              <p className="text-sm text-yellow-600">
-                Please create a company first before connecting WhatsApp.
-              </p>
-              <Link href="/onboarding">
-                <Button variant="outline" className="w-full">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Company
-                </Button>
-              </Link>
-            </div>
-          )}
+              {!currentCompany && (
+                <div className="space-y-3">
+                  <p className="text-sm text-yellow-600">
+                    Please create a company first before connecting WhatsApp.
+                  </p>
+                  <Link href="/onboarding">
+                    <Button variant="outline" className="w-full">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Company
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="manual" className="space-y-4 mt-4">
+              {error && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+                  {error}
+                </div>
+              )}
+
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>Manual Configuration</AlertTitle>
+                <AlertDescription className="text-sm mt-2">
+                  If you already have WhatsApp Business API credentials, you can configure them manually. 
+                  You&apos;ll need your WABA ID, Phone Number ID, and Access Token from Meta Business Manager.
+                </AlertDescription>
+              </Alert>
+
+              {isLoadingCompanies ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : companies && companies.length > 0 ? (
+                <div className="space-y-2">
+                  <Label htmlFor="company-select-manual">Select Company</Label>
+                  <Select
+                    value={currentCompany || ''}
+                    onValueChange={(value) => setCurrentCompany(value)}
+                  >
+                    <SelectTrigger id="company-select-manual">
+                      <SelectValue placeholder="Select a company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="waba-id">
+                    WhatsApp Business Account ID (WABA ID) <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="waba-id"
+                    type="text"
+                    placeholder="e.g., 123456789012345"
+                    value={manualConfig.wabaId}
+                    onChange={(e) =>
+                      setManualConfig({ ...manualConfig, wabaId: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-gray-500">
+                    Found in Meta Business Manager → WhatsApp Accounts
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone-number-id">
+                    Phone Number ID <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="phone-number-id"
+                    type="text"
+                    placeholder="e.g., 987654321098765"
+                    value={manualConfig.phoneNumberId}
+                    onChange={(e) =>
+                      setManualConfig({ ...manualConfig, phoneNumberId: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-gray-500">
+                    Found in Meta Business Manager → WhatsApp Accounts → Phone Numbers
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="access-token">
+                    Access Token <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="access-token"
+                    type="password"
+                    placeholder="Enter your access token"
+                    value={manualConfig.accessToken}
+                    onChange={(e) =>
+                      setManualConfig({ ...manualConfig, accessToken: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-gray-500">
+                    Generate from Meta Business Manager → System Users → Access Tokens
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone-number">Phone Number (Optional)</Label>
+                  <Input
+                    id="phone-number"
+                    type="text"
+                    placeholder="e.g., +1234567890"
+                    value={manualConfig.phoneNumber}
+                    onChange={(e) =>
+                      setManualConfig({ ...manualConfig, phoneNumber: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-gray-500">
+                    Display phone number (will be auto-detected if not provided)
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleManualConfigure}
+                disabled={isConnecting || !currentCompany}
+                className="w-full"
+                size="lg"
+              >
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Configuring...
+                  </>
+                ) : (
+                  'Save Configuration'
+                )}
+              </Button>
+
+              {!currentCompany && (
+                <div className="space-y-3">
+                  <p className="text-sm text-yellow-600">
+                    Please create a company first before configuring WhatsApp.
+                  </p>
+                  <Link href="/onboarding">
+                    <Button variant="outline" className="w-full">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Company
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
