@@ -1,54 +1,106 @@
 'use client';
 
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, FileText, RefreshCw, Loader2, AlertCircle, CheckCircle2, XCircle, Clock } from 'lucide-react';
-import Link from 'next/link';
-import { whatsappApi } from '@/lib/api/whatsapp';
+import {
+  Plus,
+  FileText,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Edit,
+  Trash2,
+  Send,
+} from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth-store';
+import {
+  templatesApi,
+  type Template,
+  type TemplatePayload,
+} from '@/lib/api/templates';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-interface WhatsAppTemplate {
-  id: string;
+interface TemplateFormValues {
   name: string;
-  category: string;
+  category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
   language: string;
-  status: 'APPROVED' | 'PENDING' | 'REJECTED';
-  components: Array<{
-    type: string;
-    format?: string;
-    text?: string;
-    buttons?: Array<{
-      type: string;
-      text?: string;
-      url?: string;
-    }>;
-  }>;
+  headerText?: string;
+  bodyText: string;
+  footerText?: string;
 }
 
 export default function TemplatesPage() {
   const { currentCompany } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
 
   const {
-    data: templatesData,
+    data,
     isLoading,
     isError,
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ['whatsapp-templates', currentCompany],
+    queryKey: ['templates', currentCompany],
     queryFn: async () => {
       if (!currentCompany) {
         throw new Error('No company selected');
       }
-      return whatsappApi.getTemplates(currentCompany);
+      return templatesApi.list(currentCompany, 1, 50);
     },
     enabled: !!currentCompany,
-    retry: 1,
+  });
+
+  const templates: Template[] = data?.data || [];
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { isSubmitting },
+    watch,
+  } = useForm<TemplateFormValues>({
+    defaultValues: {
+      name: '',
+      category: 'MARKETING',
+      language: 'en_US',
+      headerText: '',
+      bodyText: '',
+      footerText: '',
+    },
   });
 
   const getStatusBadge = (status: string) => {
@@ -92,7 +144,7 @@ export default function TemplatesPage() {
     );
   };
 
-  const renderTemplateContent = (template: WhatsAppTemplate) => {
+  const renderTemplateContent = (template: Template) => {
     const headerComponent = template.components?.find((c) => c.type === 'HEADER');
     const bodyComponent = template.components?.find((c) => c.type === 'BODY');
     const footerComponent = template.components?.find((c) => c.type === 'FOOTER');
@@ -121,6 +173,109 @@ export default function TemplatesPage() {
     );
   };
 
+  const openCreateDialog = () => {
+    setEditingTemplate(null);
+    reset({
+      name: '',
+      category: 'MARKETING',
+      language: 'en_US',
+      headerText: '',
+      bodyText: '',
+      footerText: '',
+    });
+    setIsFormOpen(true);
+  };
+
+  const openEditDialog = (template: Template) => {
+    setEditingTemplate(template);
+    const header = template.components.find((c) => c.type === 'HEADER');
+    const body = template.components.find((c) => c.type === 'BODY');
+    const footer = template.components.find((c) => c.type === 'FOOTER');
+
+    reset({
+      name: template.name,
+      category: template.category,
+      language: template.language,
+      headerText: header?.text || '',
+      bodyText: body?.text || '',
+      footerText: footer?.text || '',
+    });
+    setIsFormOpen(true);
+  };
+
+  const buildComponents = (values: TemplateFormValues) => {
+    const components = [];
+    if (values.headerText?.trim()) {
+      components.push({
+        type: 'HEADER',
+        format: 'TEXT',
+        text: values.headerText.trim(),
+      });
+    }
+    components.push({
+      type: 'BODY',
+      text: values.bodyText.trim(),
+    });
+    if (values.footerText?.trim()) {
+      components.push({
+        type: 'FOOTER',
+        text: values.footerText.trim(),
+      });
+    }
+    return components;
+  };
+
+  const onSubmit = async (values: TemplateFormValues) => {
+    if (!currentCompany) return;
+    const payload: TemplatePayload = {
+      name: values.name.trim(),
+      category: values.category,
+      language: values.language.trim(),
+      components: buildComponents(values),
+    };
+
+    if (editingTemplate) {
+      await templatesApi.update(currentCompany, editingTemplate.id, payload);
+    } else {
+      await templatesApi.create(currentCompany, payload);
+    }
+
+    setIsFormOpen(false);
+    setEditingTemplate(null);
+    reset();
+    refetch();
+  };
+
+  const handleDelete = async (template: Template) => {
+    if (!currentCompany) return;
+    const confirmed = window.confirm(`Delete template "${template.name}"?`);
+    if (!confirmed) return;
+    await templatesApi.remove(currentCompany, template.id);
+    refetch();
+  };
+
+  const handleSubmitToMeta = async (template: Template) => {
+    if (!currentCompany) return;
+    setError(null);
+    try {
+      await templatesApi.submit(currentCompany, template.id);
+      refetch();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to submit template');
+    }
+  };
+
+  const handleSync = async () => {
+    if (!currentCompany) return;
+    setError(null);
+    try {
+      await templatesApi.sync(currentCompany);
+      refetch();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to sync templates');
+    }
+  };
+
   if (!currentCompany) {
     return (
       <div className="space-y-6">
@@ -139,6 +294,7 @@ export default function TemplatesPage() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -150,18 +306,16 @@ export default function TemplatesPage() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => refetch()}
+            onClick={handleSync}
             disabled={isRefetching || isLoading}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
             {isRefetching ? 'Syncing...' : 'Sync Templates'}
           </Button>
-          <Link href="/dashboard/templates/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Template
-            </Button>
-          </Link>
+          <Button onClick={openCreateDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Template
+          </Button>
         </div>
       </div>
 
@@ -186,9 +340,9 @@ export default function TemplatesPage() {
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           <span className="ml-2 text-gray-600">Loading templates...</span>
         </div>
-      ) : templatesData?.templates && templatesData.templates.length > 0 ? (
+      ) : templates.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {(templatesData.templates as WhatsAppTemplate[]).map((template) => (
+          {templates.map((template) => (
             <Card key={template.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -205,9 +359,40 @@ export default function TemplatesPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {renderTemplateContent(template)}
-                <div className="pt-2 border-t">
-                  <Button variant="outline" className="w-full" size="sm">
-                    View Details
+                {template.rejectionReason && (
+                  <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md p-2">
+                    Rejection reason: {template.rejectionReason}
+                  </div>
+                )}
+                <div className="pt-2 border-t space-y-2">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openEditDialog(template)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-red-600"
+                      onClick={() => handleDelete(template)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    disabled={template.status !== 'DRAFT'}
+                    onClick={() => handleSubmitToMeta(template)}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Submit to Meta
                   </Button>
                 </div>
               </CardContent>
@@ -230,8 +415,84 @@ export default function TemplatesPage() {
         </div>
       )}
     </div>
+
+    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{editingTemplate ? 'Edit template' : 'Create template'}</DialogTitle>
+          <DialogDescription>
+            Template names must be lowercase and can include numbers or underscores. Body section is
+            required.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="name">Template name *</Label>
+              <Input id="name" placeholder="welcome_offer" {...register('name', { required: true })} />
+              <p className="text-xs text-gray-500">Lowercase letters, numbers, and underscores.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Language *</Label>
+              <Input id="language" placeholder="en_US" {...register('language', { required: true })} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Category *</Label>
+              <Select
+                value={watch('category')}
+                onValueChange={(value) =>
+                  setValue('category', value as TemplateFormValues['category'])
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MARKETING">Marketing</SelectItem>
+                  <SelectItem value="UTILITY">Utility</SelectItem>
+                  <SelectItem value="AUTHENTICATION">Authentication</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Header (optional)</Label>
+              <Input placeholder="Welcome to our store!" {...register('headerText')} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Body *</Label>
+            <Textarea
+              placeholder="Hi {{1}}, thanks for contacting us..."
+              className="min-h-[140px]"
+              {...register('bodyText', { required: true })}
+            />
+            <p className="text-xs text-gray-500">
+              Use placeholders like &#123;&#123;1&#125;&#125; for variables.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Footer (optional)</Label>
+            <Input placeholder="Reply STOP to unsubscribe" {...register('footerText')} />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingTemplate ? 'Save changes' : 'Create template'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
-
-
-
