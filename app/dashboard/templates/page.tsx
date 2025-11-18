@@ -63,6 +63,7 @@ interface TemplateFormValues {
 export default function TemplatesPage() {
   const { currentCompany } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
 
@@ -227,23 +228,66 @@ export default function TemplatesPage() {
 
   const onSubmit = async (values: TemplateFormValues) => {
     if (!currentCompany) return;
-    const payload: TemplatePayload = {
-      name: values.name.trim(),
-      category: values.category,
-      language: values.language.trim(),
-      components: buildComponents(values),
-    };
+    setFormError(null);
+    setError(null);
 
-    if (editingTemplate) {
-      await templatesApi.update(currentCompany, editingTemplate.id, payload);
-    } else {
-      await templatesApi.create(currentCompany, payload);
+    const sanitizedName = values.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    if (!sanitizedName) {
+      setFormError('Template name must use lowercase letters, numbers, or underscores.');
+      return;
     }
 
-    setIsFormOpen(false);
-    setEditingTemplate(null);
-    reset();
-    refetch();
+    const headerText = values.headerText?.trim();
+    const bodyText = values.bodyText.trim();
+    const footerText = values.footerText?.trim();
+
+    if (!bodyText) {
+      setFormError('Body text is required.');
+      return;
+    }
+    if (bodyText.length > 1024) {
+      setFormError('Body text cannot exceed 1024 characters.');
+      return;
+    }
+    if (headerText && headerText.length > 60) {
+      setFormError('Header text cannot exceed 60 characters.');
+      return;
+    }
+    if (footerText && footerText.length > 60) {
+      setFormError('Footer text cannot exceed 60 characters.');
+      return;
+    }
+    const placeholderError = validatePlaceholderUsage(bodyText);
+    if (placeholderError) {
+      setFormError(placeholderError);
+      return;
+    }
+
+    const payload: TemplatePayload = {
+      name: sanitizedName,
+      category: values.category,
+      language: values.language.trim(),
+      components: buildComponents({
+        ...values,
+        headerText,
+        bodyText,
+        footerText,
+      }),
+    };
+
+    try {
+      if (editingTemplate) {
+        await templatesApi.update(currentCompany, editingTemplate.id, payload);
+      } else {
+        await templatesApi.create(currentCompany, payload);
+      }
+      setIsFormOpen(false);
+      setEditingTemplate(null);
+      reset();
+      refetch();
+    } catch (err: any) {
+      setFormError(err.response?.data?.message || 'Unable to save template.');
+    }
   };
 
   const handleDelete = async (template: Template) => {
@@ -481,6 +525,9 @@ export default function TemplatesPage() {
             <Input placeholder="Reply STOP to unsubscribe" {...register('footerText')} />
           </div>
 
+          {formError && (
+            <div className="text-sm text-red-600">{formError}</div>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
               Cancel
@@ -495,4 +542,32 @@ export default function TemplatesPage() {
     </Dialog>
     </>
   );
+}
+
+function validatePlaceholderUsage(text: string): string | null {
+  const regex = /{{(\d+)}}/g;
+  const indices = new Set<number>();
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    const index = parseInt(match[1], 10);
+    if (!index || index < 1) {
+      return 'Placeholder indexes must start from {{1}}.';
+    }
+    if (index > 10) {
+      return 'A maximum of 10 placeholders ({{1}} to {{10}}) are allowed.';
+    }
+    indices.add(index);
+  }
+
+  if (indices.size > 0) {
+    const max = Math.max(...Array.from(indices.values()));
+    for (let i = 1; i <= max; i += 1) {
+      if (!indices.has(i)) {
+        return 'Placeholders must be sequential without gaps ({{1}}, {{2}}, ...).';
+      }
+    }
+  }
+
+  return null;
 }
