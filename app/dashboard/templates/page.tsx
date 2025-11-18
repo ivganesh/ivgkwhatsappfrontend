@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -31,6 +32,7 @@ import {
   templatesApi,
   type Template,
   type TemplatePayload,
+  type TemplateComponent,
 } from '@/lib/api/templates';
 import {
   Dialog,
@@ -60,12 +62,27 @@ interface TemplateFormValues {
   footerText?: string;
 }
 
+function getPlaceholderIndexes(text: string): number[] {
+  const regex = /{{(\d+)}}/g;
+  const indexes = new Set<number>();
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    const value = parseInt(match[1], 10);
+    if (!Number.isNaN(value) && value > 0) {
+      indexes.add(value);
+    }
+  }
+  return Array.from(indexes).sort((a, b) => a - b);
+}
+
 export default function TemplatesPage() {
   const { currentCompany } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  const [bodySamples, setBodySamples] = useState<string[]>([]);
+  const [headerSamples, setHeaderSamples] = useState<string[]>([]);
 
   const {
     data,
@@ -103,6 +120,53 @@ export default function TemplatesPage() {
       footerText: '',
     },
   });
+
+  const bodyTextValue = watch('bodyText');
+  const headerTextValue = watch('headerText');
+
+  const bodyPlaceholderIndexes = useMemo(
+    () => getPlaceholderIndexes(bodyTextValue || ''),
+    [bodyTextValue],
+  );
+
+  const headerPlaceholderIndexes = useMemo(
+    () => getPlaceholderIndexes(headerTextValue || ''),
+    [headerTextValue],
+  );
+
+  useEffect(() => {
+    const max = bodyPlaceholderIndexes.length
+      ? Math.max(...bodyPlaceholderIndexes)
+      : 0;
+    setBodySamples((prev) => {
+      const next = [...prev];
+      if (max > next.length) {
+        while (next.length < max) {
+          next.push('');
+        }
+      } else if (max < next.length) {
+        next.splice(max);
+      }
+      return next;
+    });
+  }, [bodyPlaceholderIndexes]);
+
+  useEffect(() => {
+    const max = headerPlaceholderIndexes.length
+      ? Math.max(...headerPlaceholderIndexes)
+      : 0;
+    setHeaderSamples((prev) => {
+      const next = [...prev];
+      if (max > next.length) {
+        while (next.length < max) {
+          next.push('');
+        }
+      } else if (max < next.length) {
+        next.splice(max);
+      }
+      return next;
+    });
+  }, [headerPlaceholderIndexes]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -184,6 +248,8 @@ export default function TemplatesPage() {
       bodyText: '',
       footerText: '',
     });
+    setBodySamples([]);
+    setHeaderSamples([]);
     setIsFormOpen(true);
   };
 
@@ -201,22 +267,51 @@ export default function TemplatesPage() {
       bodyText: body?.text || '',
       footerText: footer?.text || '',
     });
+    const bodyExamples =
+      (body?.example as any)?.body_text?.[0] ||
+      (Array.isArray((body?.example as any)?.body_text)
+        ? (body?.example as any)?.body_text
+        : []);
+    setBodySamples(
+      Array.isArray(bodyExamples) ? [...bodyExamples] : [],
+    );
+    const headerExamples =
+      (header?.example as any)?.header_text ||
+      (header?.example as any)?.header_handle;
+    setHeaderSamples(
+      Array.isArray(headerExamples)
+        ? [...headerExamples]
+        : headerExamples
+        ? [headerExamples]
+        : [],
+    );
     setIsFormOpen(true);
   };
 
-  const buildComponents = (values: TemplateFormValues) => {
-    const components = [];
+  const buildComponents = (
+    values: TemplateFormValues,
+    samples: { body: string[]; header: string[] },
+  ) => {
+    const components: TemplateComponent[] = [];
     if (values.headerText?.trim()) {
-      components.push({
+      const header: TemplateComponent = {
         type: 'HEADER',
         format: 'TEXT',
         text: values.headerText.trim(),
-      });
+      };
+      if (samples.header.length > 0) {
+        header.example = { header_text: samples.header };
+      }
+      components.push(header);
     }
-    components.push({
+    const body: TemplateComponent = {
       type: 'BODY',
       text: values.bodyText.trim(),
-    });
+    };
+    if (samples.body.length > 0) {
+      body.example = { body_text: [samples.body] };
+    }
+    components.push(body);
     if (values.footerText?.trim()) {
       components.push({
         type: 'FOOTER',
@@ -262,17 +357,36 @@ export default function TemplatesPage() {
       setFormError(placeholderError);
       return;
     }
+    if (bodyPlaceholderIndexes.length > 0) {
+      for (let i = 0; i < bodyPlaceholderIndexes.length; i += 1) {
+        if (!bodySamples[i] || !bodySamples[i].trim()) {
+          setFormError(`Provide sample text for placeholder {{${i + 1}}}.`);
+          return;
+        }
+      }
+    }
+    if (headerPlaceholderIndexes.length > 0) {
+      for (let i = 0; i < headerPlaceholderIndexes.length; i += 1) {
+        if (!headerSamples[i] || !headerSamples[i].trim()) {
+          setFormError(`Provide sample text for header placeholder {{${i + 1}}}.`);
+          return;
+        }
+      }
+    }
 
     const payload: TemplatePayload = {
       name: sanitizedName,
       category: values.category,
       language: values.language.trim(),
-      components: buildComponents({
-        ...values,
-        headerText,
-        bodyText,
-        footerText,
-      }),
+      components: buildComponents(
+        {
+          ...values,
+          headerText,
+          bodyText,
+          footerText,
+        },
+        { body: bodySamples.map((sample) => sample.trim()), header: headerSamples.map((s) => s.trim()) },
+      ),
     };
 
     try {
@@ -507,6 +621,26 @@ export default function TemplatesPage() {
               <Input placeholder="Welcome to our store!" {...register('headerText')} />
             </div>
           </div>
+          {headerPlaceholderIndexes.length > 0 && (
+            <div className="space-y-2">
+              <Label>Header sample values *</Label>
+              <div className="space-y-2">
+                {headerPlaceholderIndexes.map((index) => (
+                  <Input
+                    key={`header-sample-${index}`}
+                    placeholder={`Sample for header {{${index}}}`}
+                    value={headerSamples[index - 1] || ''}
+                    onChange={(e) => {
+                      const next = [...headerSamples];
+                      next[index - 1] = e.target.value;
+                      setHeaderSamples(next);
+                    }}
+                    required
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Body *</Label>
@@ -519,6 +653,38 @@ export default function TemplatesPage() {
               Use placeholders like &#123;&#123;1&#125;&#125; for variables.
             </p>
           </div>
+
+          {bodyPlaceholderIndexes.length > 0 && (
+            <div className="space-y-2">
+              <Label>Body sample values *</Label>
+              <div className="space-y-2">
+                {bodyPlaceholderIndexes.map((index) => (
+                  <Input
+                    key={`body-sample-${index}`}
+                    placeholder={`Sample for {{${index}}}`}
+                    value={bodySamples[index - 1] || ''}
+                    onChange={(e) => {
+                      const next = [...bodySamples];
+                      next[index - 1] = e.target.value;
+                      setBodySamples(next);
+                    }}
+                    required
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-gray-500">
+                WhatsApp requires sample text for each placeholder before review.{' '}
+                <Link
+                  href="https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview"
+                  target="_blank"
+                  className="text-blue-600 underline"
+                >
+                  Learn more
+                </Link>
+                .
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Footer (optional)</Label>
