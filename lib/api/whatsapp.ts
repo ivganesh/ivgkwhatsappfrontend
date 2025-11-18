@@ -49,6 +49,11 @@ export const whatsappApi = {
     });
     return response.data;
   },
+
+  getTemplates: async (companyId: string) => {
+    const response = await apiClient.get(`/whatsapp/templates?companyId=${companyId}`);
+    return response.data;
+  },
 };
 
 
