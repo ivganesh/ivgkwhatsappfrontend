@@ -546,7 +546,12 @@ export default function TemplatesPage() {
                   <Button
                     size="sm"
                     className="w-full"
-                    disabled={template.status !== 'DRAFT'}
+                    disabled={
+                      !(
+                        template.status === 'DRAFT' ||
+                        template.status === 'REJECTED'
+                      )
+                    }
                     onClick={() => handleSubmitToMeta(template)}
                   >
                     <Send className="mr-2 h-4 w-4" />
