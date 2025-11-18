@@ -43,18 +43,12 @@ export const templatesApi = {
   },
 
   create: async (companyId: string, payload: TemplatePayload) => {
-    const response = await apiClient.post('/templates', {
-      companyId,
-      ...payload,
-    });
+    const response = await apiClient.post(`/templates?companyId=${companyId}`, payload);
     return response.data;
   },
 
   update: async (companyId: string, id: string, payload: Partial<TemplatePayload>) => {
-    const response = await apiClient.patch(`/templates/${id}`, {
-      companyId,
-      ...payload,
-    });
+    const response = await apiClient.patch(`/templates/${id}?companyId=${companyId}`, payload);
     return response.data;
   },
 

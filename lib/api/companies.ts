@@ -4,12 +4,23 @@ export interface Company {
   id: string;
   name: string;
   slug: string;
-  logo?: string;
+  logo?: string | null;
   timezone: string;
   locale: string;
   whatsappConnected: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CompanyDetail extends Company {
+  whatsappPhoneId?: string | null;
+  whatsappBusinessId?: string | null;
+  whatsappWebhookToken?: string | null;
+  owner?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
 export interface CreateCompanyDto {
@@ -30,8 +41,13 @@ export const companiesApi = {
     return response.data;
   },
 
-  getById: async (id: string): Promise<Company> => {
+  getById: async (id: string): Promise<CompanyDetail> => {
     const response = await apiClient.get(`/companies/${id}`);
+    return response.data;
+  },
+
+  update: async (id: string, data: Partial<CreateCompanyDto>) => {
+    const response = await apiClient.patch(`/companies/${id}`, data);
     return response.data;
   },
 };
